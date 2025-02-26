@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, redirect, url_for, session
+from flask import Flask, request, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 import datetime
 import logging
@@ -12,7 +12,7 @@ db = SQLAlchemy(app)
 class AssetLock(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     branch = db.Column(db.String(100), nullable=False)
-    repo_url = db.Column(db.String(255), nullable=False)  # New field: repository origin URL.
+    repo_url = db.Column(db.String(255), nullable=False)
     file_path = db.Column(db.String(255), nullable=False)
     user = db.Column(db.String(100), nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
@@ -20,30 +20,28 @@ class AssetLock(db.Model):
         db.UniqueConstraint('branch', 'repo_url', 'file_path', name='_branch_repo_file_uc'),
     )
 
+    def __init__(self, branch, repo_url, file_path, user):
+        self.branch = branch
+        self.repo_url = repo_url
+        self.file_path = file_path
+        self.user = user
+
 
 @app.before_request
 def log_request_info():
-    # Log HTTP method and URL
     app.logger.info(f"Received {request.method} request for {request.url}")
 
-    # Log GET parameters if present
     if request.args:
         app.logger.info("GET parameters: %s", dict(request.args))
-    
-    # Log POST requests details
+
     if request.method == 'POST':
-        # Log form data
         if request.form:
             app.logger.info("POST form parameters: %s", dict(request.form))
-        # Log JSON payload
         elif request.is_json:
             app.logger.info("POST JSON parameters: %s", request.get_json())
-        # Log file uploads if present
         if request.files:
-            # Create a dict with file field name and the filename for each uploaded file.
             files_info = {key: file.filename for key, file in request.files.items()}
             app.logger.info("Uploaded files: %s", files_info)
-        # If none of the above, log raw data
         elif not request.form and not request.is_json:
             app.logger.info("POST raw data: %s", request.get_data())
 
@@ -52,14 +50,13 @@ def log_request_info():
 def lock_asset():
     data = request.form
     branch = data.get('branch')
-    repo_url = data.get('origin')  # Repository origin URL
+    repo_url = data.get('origin')
     file_path = data.get('filePath')
-    user = data.get('userName') or session.get("user_email")  # Use provided username or logged-in Google email.
+    user = data.get('userName') or session.get("user_email")
     
     if not branch or not repo_url or not file_path or not user:
         return jsonify({'error': 'Missing required parameters (branch, origin, filePath, userName)'}), 400
 
-    # Query lock by branch, repo_url and file_path.
     existing_lock = AssetLock.query.filter_by(branch=branch, repo_url=repo_url, file_path=file_path).first()
     if existing_lock:
         if existing_lock.user == user:
