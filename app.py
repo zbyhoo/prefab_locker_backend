@@ -1,16 +1,14 @@
 from flask import Flask, request, jsonify, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 import datetime
+import logging
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey"  # Required for session management.
-
-# SQLite is used for simplicity.
+logging.basicConfig(level=logging.INFO)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////app/data/locks.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# Database model updated with repo_url (origin repository URL).
 class AssetLock(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     branch = db.Column(db.String(100), nullable=False)
@@ -21,6 +19,33 @@ class AssetLock(db.Model):
     __table_args__ = (
         db.UniqueConstraint('branch', 'repo_url', 'file_path', name='_branch_repo_file_uc'),
     )
+
+
+@app.before_request
+def log_request_info():
+    # Log HTTP method and URL
+    app.logger.info(f"Received {request.method} request for {request.url}")
+
+    # Log GET parameters if present
+    if request.args:
+        app.logger.info("GET parameters: %s", dict(request.args))
+    
+    # Log POST requests details
+    if request.method == 'POST':
+        # Log form data
+        if request.form:
+            app.logger.info("POST form parameters: %s", dict(request.form))
+        # Log JSON payload
+        elif request.is_json:
+            app.logger.info("POST JSON parameters: %s", request.get_json())
+        # Log file uploads if present
+        if request.files:
+            # Create a dict with file field name and the filename for each uploaded file.
+            files_info = {key: file.filename for key, file in request.files.items()}
+            app.logger.info("Uploaded files: %s", files_info)
+        # If none of the above, log raw data
+        elif not request.form and not request.is_json:
+            app.logger.info("POST raw data: %s", request.get_data())
 
 
 @app.route('/lock', methods=['POST'])
