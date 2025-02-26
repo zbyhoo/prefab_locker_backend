@@ -6,7 +6,7 @@ app = Flask(__name__)
 app.secret_key = "supersecretkey"  # Required for session management.
 
 # SQLite is used for simplicity.
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///locks.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////app/data/locks.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -22,9 +22,6 @@ class AssetLock(db.Model):
         db.UniqueConstraint('branch', 'repo_url', 'file_path', name='_branch_repo_file_uc'),
     )
 
-###############################################################################
-# Locking Endpoints
-###############################################################################
 
 @app.route('/lock', methods=['POST'])
 def lock_asset():
@@ -50,6 +47,7 @@ def lock_asset():
     db.session.commit()
     return jsonify({'message': 'Asset locked successfully'}), 200
 
+
 @app.route('/unlock', methods=['POST'])
 def unlock_asset():
     data = request.form
@@ -72,6 +70,7 @@ def unlock_asset():
     db.session.commit()
     return jsonify({'message': 'Asset unlocked successfully'}), 200
 
+
 @app.route('/status', methods=['GET'])
 def lock_status():
     branch = request.args.get('branch')
@@ -91,6 +90,7 @@ def lock_status():
     else:
         return jsonify({'locked': False}), 200
 
+
 @app.route('/lockedAssets', methods=['GET'])
 def locked_assets():
     branch = request.args.get('branch')
@@ -103,14 +103,6 @@ def locked_assets():
     lock_dict = {lock.file_path: lock.user for lock in locks}
     return jsonify({"locks": lock_dict}), 200
 
-###############################################################################
-# Google Login Endpoints (if using Google authentication)
-###############################################################################
-# ... (Google OAuth endpoints would go here if desired)
-
-###############################################################################
-# Run the App
-###############################################################################
 
 if __name__ == '__main__':
     with app.app_context():
