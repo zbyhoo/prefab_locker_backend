@@ -17,7 +17,7 @@ class AssetLock(db.Model):
     user = db.Column(db.String(100), nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     __table_args__ = (
-        db.UniqueConstraint('branch', 'repo_url', 'file_path', name='_branch_repo_file_uc'),
+        db.UniqueConstraint('file_path', name='_branch_repo_file_uc'),
     )
 
     def __init__(self, branch, repo_url, file_path, user):
@@ -57,7 +57,7 @@ def lock_asset():
     if not branch or not repo_url or not file_path or not user:
         return jsonify({'error': 'Missing required parameters (branch, origin, filePath, userName)'}), 400
 
-    existing_lock = AssetLock.query.filter_by(branch=branch, repo_url=repo_url, file_path=file_path).first()
+    existing_lock = AssetLock.query.filter_by(file_path=file_path).first()
     if existing_lock:
         if existing_lock.user == user:
             return jsonify({'message': 'Asset already locked by you'}), 200
@@ -73,15 +73,13 @@ def lock_asset():
 @app.route('/unlock', methods=['POST'])
 def unlock_asset():
     data = request.form
-    branch = data.get('branch')
-    repo_url = data.get('origin')
     file_path = data.get('filePath')
     user = data.get('userName') or session.get("user_email")
     
-    if not branch or not repo_url or not file_path or not user:
+    if not file_path or not user:
         return jsonify({'error': 'Missing required parameters (branch, origin, filePath, userName)'}), 400
 
-    existing_lock = AssetLock.query.filter_by(branch=branch, repo_url=repo_url, file_path=file_path).first()
+    existing_lock = AssetLock.query.filter_by(file_path=file_path).first()
     if not existing_lock:
         return jsonify({'error': 'Asset is not locked'}), 404
 
@@ -95,18 +93,14 @@ def unlock_asset():
 
 @app.route('/status', methods=['GET'])
 def lock_status():
-    branch = request.args.get('branch')
-    repo_url = request.args.get('origin')
     file_path = request.args.get('filePath')
     
-    if not branch or not repo_url or not file_path:
-        return jsonify({'error': 'Missing required parameters (branch, origin, filePath)'}), 400
-
-    existing_lock = AssetLock.query.filter_by(branch=branch, repo_url=repo_url, file_path=file_path).first()
+    existing_lock = AssetLock.query.filter_by(file_path=file_path).first()
     if existing_lock:
         return jsonify({
             'locked': True,
             'user': existing_lock.user,
+            'branch': existing_lock.branch,
             'timestamp': existing_lock.timestamp.isoformat()
         }), 200
     else:
@@ -115,14 +109,14 @@ def lock_status():
 
 @app.route('/lockedAssets', methods=['GET'])
 def locked_assets():
-    branch = request.args.get('branch')
-    repo_url = request.args.get('origin')
-    
-    if not branch or not repo_url:
-        return jsonify({'error': 'Missing required parameters (branch, origin)'}), 400
-
-    locks = AssetLock.query.filter_by(branch=branch, repo_url=repo_url).all()
-    lock_dict = {lock.file_path: lock.user for lock in locks}
+    locks = AssetLock.query.all()
+    lock_dict = {
+        lock.file_path: {
+            "user": lock.user,
+            "branch": lock.branch
+        }
+        for lock in locks
+    }
     return jsonify({"locks": lock_dict}), 200
 
 
