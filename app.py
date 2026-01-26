@@ -120,6 +120,11 @@ def locked_assets():
     return jsonify({"locks": lock_dict}), 200
 
 
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({'status': 'ok'}), 200
+
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
