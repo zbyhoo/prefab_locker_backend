@@ -3,7 +3,7 @@ services:
   myapp:
     build: .
     ports:
-      - "5005:5005"
+      - "5055:5055"
     volumes:
       - sqlite_data:/app/data
 volumes:
